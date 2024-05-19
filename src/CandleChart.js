@@ -11,7 +11,7 @@ const CandleChart = () => {
   useEffect(() => {
     // Upbit API에서 데이터를 가져옴
     axios
-      .get("https://api.upbit.com/v1/candles/minutes/1?market=KRW-BTC&count=100")
+      .get("https://api.upbit.com/v1/candles/minutes/1?market=KRW-BTC&count=103")
       .then((response) => {
         const transformedData = response.data
           .map((d) => ({
@@ -35,7 +35,7 @@ const CandleChart = () => {
 
     const width = 800;
     const height = 400;
-    const margin = { top: 20, right: 30, bottom: 30, left: 50 };
+    const margin = { top: 20, right: 80, bottom: 30, left: 30 }; // 오른쪽 여백을 80으로 설정
 
     // x축과 y축 설정
     const x = d3
@@ -57,14 +57,14 @@ const CandleChart = () => {
           d3
             .axisBottom(x)
             .tickFormat(d3.timeFormat("%H:%M"))
-            .tickValues(x.domain().filter((d, i) => !(i % 10)))
+            .tickValues(x.domain().filter((d) => d.getMinutes() % 10 === 0))
         )
         .call((g) => g.select(".domain").remove());
 
     const yAxis = (g) =>
       g
-        .attr("transform", `translate(${margin.left},0)`)
-        .call(d3.axisLeft(y))
+        .attr("transform", `translate(${width - margin.right},0)`)
+        .call(d3.axisRight(y))
         .call((g) => g.select(".domain").remove())
         .call((g) => g.selectAll(".tick text").style("font-size", "12px").style("font-weight", "bold"));
 
