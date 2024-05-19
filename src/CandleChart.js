@@ -9,6 +9,7 @@ const CandleChart = () => {
   const [data, setData] = useState([]);
 
   useEffect(() => {
+    // Upbit API에서 데이터를 가져옴
     axios
       .get("https://api.upbit.com/v1/candles/minutes/1?market=KRW-BTC&count=100")
       .then((response) => {
@@ -20,7 +21,7 @@ const CandleChart = () => {
             low: d.low_price,
             close: d.trade_price,
           }))
-          .reverse();
+          .reverse(); // 최신 데이터를 오른쪽에 표시하기 위해 데이터 순서를 뒤집음
         setData(transformedData);
       })
       .catch((error) => console.error("Error fetching data: ", error));
@@ -30,12 +31,13 @@ const CandleChart = () => {
     if (data.length === 0) return;
 
     const svg = d3.select(svgRef.current);
-    svg.selectAll("*").remove(); // Clear previous content
+    svg.selectAll("*").remove(); // 이전 내용을 지움
 
     const width = 800;
     const height = 400;
-    const margin = { top: 20, right: 30, bottom: 30, left: 40 };
+    const margin = { top: 20, right: 30, bottom: 30, left: 50 };
 
+    // x축과 y축 설정
     const x = d3
       .scaleBand()
       .domain(data.map((d) => d.date))
@@ -63,11 +65,13 @@ const CandleChart = () => {
       g
         .attr("transform", `translate(${margin.left},0)`)
         .call(d3.axisLeft(y))
-        .call((g) => g.select(".domain").remove());
+        .call((g) => g.select(".domain").remove())
+        .call((g) => g.selectAll(".tick text").style("font-size", "12px").style("font-weight", "bold"));
 
     svg.append("g").call(xAxis);
     svg.append("g").call(yAxis);
 
+    // 캔들스틱 차트 그리기
     svg
       .append("g")
       .selectAll("rect")
@@ -77,7 +81,7 @@ const CandleChart = () => {
       .attr("y", (d) => y(Math.max(d.open, d.close)))
       .attr("height", (d) => Math.abs(y(d.open) - y(d.close)))
       .attr("width", x.bandwidth())
-      .attr("fill", (d) => (d.open > d.close ? "red" : "blue"));
+      .attr("fill", (d) => (d.close > d.open ? "red" : "blue")); // close 값이 open 값보다 크면 빨간색, 작으면 파란색
 
     svg
       .append("g")
