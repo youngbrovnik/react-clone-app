@@ -12,13 +12,15 @@ const CandleChart = () => {
     axios
       .get("https://api.upbit.com/v1/candles/minutes/1?market=KRW-BTC&count=100")
       .then((response) => {
-        const transformedData = response.data.map((d) => ({
-          date: new Date(d.timestamp),
-          open: d.opening_price,
-          high: d.high_price,
-          low: d.low_price,
-          close: d.trade_price,
-        }));
+        const transformedData = response.data
+          .map((d) => ({
+            date: new Date(d.timestamp),
+            open: d.opening_price,
+            high: d.high_price,
+            low: d.low_price,
+            close: d.trade_price,
+          }))
+          .reverse();
         setData(transformedData);
       })
       .catch((error) => console.error("Error fetching data: ", error));
