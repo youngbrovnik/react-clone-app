@@ -7,25 +7,49 @@ import axios from "axios";
 const CandleChart = () => {
   const svgRef = useRef();
   const [data, setData] = useState([]);
+  const [interval, setInterval] = useState("minutes/1"); // 기본값을 minutes/1로 설정
+
+  const intervals = {
+    "1일": "days",
+    "1주": "weeks",
+    "한 달": "months",
+    "1분": "minutes/1",
+    "3분": "minutes/3",
+    "5분": "minutes/5",
+    "10분": "minutes/10",
+    "15분": "minutes/15",
+    "30분": "minutes/30",
+    "1시간": "minutes/60",
+    "4시간": "minutes/240",
+  };
 
   useEffect(() => {
-    // Upbit API에서 데이터를 가져옴
-    axios
-      .get("https://api.upbit.com/v1/candles/minutes/1?market=KRW-BTC&count=103")
-      .then((response) => {
-        const transformedData = response.data
-          .map((d) => ({
-            date: new Date(d.timestamp),
-            open: d.opening_price,
-            high: d.high_price,
-            low: d.low_price,
-            close: d.trade_price,
-          }))
-          .reverse(); // 최신 데이터를 오른쪽에 표시하기 위해 데이터 순서를 뒤집음
-        setData(transformedData);
-      })
-      .catch((error) => console.error("Error fetching data: ", error));
-  }, []);
+    const fetchData = (selectedInterval) => {
+      const [type, value] = selectedInterval.split("/");
+      const url =
+        type === "minutes"
+          ? `https://api.upbit.com/v1/candles/${type}/${value}?market=KRW-BTC&count=104`
+          : `https://api.upbit.com/v1/candles/${type}?market=KRW-BTC&count=104`;
+
+      axios
+        .get(url)
+        .then((response) => {
+          const transformedData = response.data
+            .map((d) => ({
+              date: new Date(d.timestamp),
+              open: d.opening_price,
+              high: d.high_price,
+              low: d.low_price,
+              close: d.trade_price,
+            }))
+            .reverse(); // 최신 데이터를 오른쪽에 표시하기 위해 데이터 순서를 뒤집음
+          setData(transformedData);
+        })
+        .catch((error) => console.error("Error fetching data: ", error));
+    };
+
+    fetchData(interval); // 초기 로드시 및 interval 값이 변경될 때마다 데이터를 가져옴
+  }, [interval]);
 
   useEffect(() => {
     if (data.length === 0) return;
@@ -50,15 +74,17 @@ const CandleChart = () => {
       .nice()
       .range([height - margin.bottom, margin.top]);
 
+    const isMinutesInterval = interval.startsWith("minutes");
+
     const xAxis = (g) =>
       g
         .attr("transform", `translate(0,${height - margin.bottom})`)
         .call(
           d3
             .axisBottom(x)
-            .tickFormat(d3.timeFormat("%H:%M"))
-            .tickValues(x.domain().filter((d) => d.getMinutes() % 10 === 0))
-        )
+            .tickFormat(d3.timeFormat(isMinutesInterval ? "%H:%M" : "%Y-%m-%d"))
+            .tickValues(x.domain().filter((d, i) => i % 10 === 0))
+        ) // 10개마다 하나씩 노출
         .call((g) => g.select(".domain").remove());
 
     const yAxis = (g) =>
@@ -93,9 +119,29 @@ const CandleChart = () => {
       .attr("y1", (d) => y(d.high))
       .attr("y2", (d) => y(d.low))
       .attr("stroke", "black");
-  }, [data]);
+  }, [data, interval]);
 
-  return <svg ref={svgRef} width={800} height={400}></svg>;
+  return (
+    <div>
+      <select onChange={(e) => setInterval(intervals[e.target.value])} defaultValue="1분">
+        <optgroup label="날짜 단위">
+          <option value="1일">1일</option>
+          <option value="1주">1주</option>
+          <option value="한 달">한 달</option>
+        </optgroup>
+        <optgroup label="분 단위">
+          {Object.keys(intervals)
+            .filter((key) => key.includes("분") || key.includes("시간"))
+            .map((key) => (
+              <option key={key} value={key}>
+                {key}
+              </option>
+            ))}
+        </optgroup>
+      </select>
+      <svg ref={svgRef} width={800} height={400}></svg>
+    </div>
+  );
 };
 
 export default CandleChart;
