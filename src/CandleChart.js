@@ -106,7 +106,7 @@ const CandleChart = () => {
           d3
             .axisBottom(x)
             .tickFormat(d3.timeFormat(isMinutesInterval ? "%H:%M" : "%Y-%m-%d"))
-            .ticks(d3.timeMinute.every(10))
+            .tickValues(filteredData.map((d, i) => (i % 10 === 0 ? d.date : null)).filter((d) => d))
         )
         .call((g) => g.select(".domain").remove());
 
