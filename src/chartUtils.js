@@ -150,11 +150,31 @@ export const drawChart = ({ svgRef, data, interval, showBollingerBands, setToolt
 
   const focus = svg.append("g").attr("class", "focus").style("display", "none");
 
-  focus.append("line").attr("class", "x-hover-line hover-line").attr("y1", 0).attr("y2", height);
+  focus
+    .append("line")
+    .attr("class", "x-hover-line hover-line")
+    .attr("stroke", "black") // 선 색상을 검정색으로 설정
+    .attr("stroke-width", 1) // 선 너비를 1로 설정
+    .attr("y1", 0)
+    .attr("y2", height);
 
-  focus.append("line").attr("class", "y-hover-line hover-line").attr("x1", width).attr("x2", width);
+  focus
+    .append("line")
+    .attr("class", "y-hover-line hover-line")
+    .attr("stroke", "black") // 선 색상을 검정색으로 설정
+    .attr("stroke-width", 1) // 선 너비를 1로 설정
+    .attr("x1", 0)
+    .attr("x2", width);
 
-  focus.append("circle").attr("r", 7.5);
+  const tooltip = d3
+    .select("body")
+    .append("div")
+    .attr("class", "tooltip")
+    .style("position", "absolute")
+    .style("background", "#f9f9f9")
+    .style("border", "1px solid #d3d3d3")
+    .style("padding", "10px")
+    .style("display", "none");
 
   svg
     .append("rect")
@@ -163,20 +183,57 @@ export const drawChart = ({ svgRef, data, interval, showBollingerBands, setToolt
     .attr("height", height - margin.top - margin.bottom)
     .style("fill", "none")
     .style("pointer-events", "all")
-    .on("mouseover", () => focus.style("display", null))
-    .on("mouseout", () => focus.style("display", "none"))
-    .on("mousemove", (event) => mousemove(event, filteredData, x, y, focus, setTooltipData, width, height));
+    .on("mouseover", () => {
+      focus.style("display", null);
+      tooltip.style("display", null);
+    })
+    .on("mouseout", () => {
+      focus.style("display", "none");
+      tooltip.style("display", "none");
+    })
+    .on("mousemove", (event) =>
+      mousemove(event, filteredData, x, y, focus, setTooltipData, candleWidth, margin, width, height, tooltip, interval)
+    );
 };
 
-const mousemove = (event, filteredData, x, y, focus, setTooltipData, width, height) => {
+const mousemove = (
+  event,
+  filteredData,
+  x,
+  y,
+  focus,
+  setTooltipData,
+  candleWidth,
+  margin,
+  width,
+  height,
+  tooltip,
+  interval
+) => {
   const bisectDate = d3.bisector((d) => d.date).left;
-  const x0 = x.invert(d3.pointer(event)[0]);
+  const mouseX = d3.pointer(event)[0] - margin.left;
+  const mouseY = d3.pointer(event)[1] - margin.top;
+  const x0 = x.invert(mouseX);
   const i = bisectDate(filteredData, x0, 1);
   const d0 = filteredData[i - 1];
   const d1 = filteredData[i];
   const d = x0 - d0.date > d1.date - x0 ? d1 : d0;
-  focus.attr("transform", `translate(${x(d.date)},${y(d.close)})`);
-  focus.select(".x-hover-line").attr("y2", height - y(d.close));
-  focus.select(".y-hover-line").attr("x2", width + width);
+
+  focus
+    .select(".x-hover-line")
+    .attr("transform", `translate(${mouseX + margin.left},0)`)
+    .attr("y2", height - margin.top - margin.bottom);
+
+  focus
+    .select(".y-hover-line")
+    .attr("transform", `translate(0,${mouseY + margin.top})`)
+    .attr("x2", width - margin.left - margin.right);
+
   setTooltipData(d);
+
+  const dateFormat = interval.startsWith("minutes") ? d3.timeFormat("%m/%d %H:%M") : d3.timeFormat("%Y-%m-%d");
+  tooltip
+    .html(`X: ${dateFormat(d.date)}<br>Y: ${d.close}`)
+    .style("left", `${d3.pointer(event)[0] + 15}px`)
+    .style("top", `${d3.pointer(event)[1] + 15}px`);
 };
