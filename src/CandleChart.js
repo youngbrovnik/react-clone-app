@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { fetchData, drawChart } from "./chartUtils";
+import "./CandleChart.css"; // 스타일링을 위해 CSS 파일을 임포트합니다.
 
 const CandleChart = () => {
   const svgRef = useRef();
   const [data, setData] = useState([]);
   const [interval, setInterval] = useState("minutes/1"); // 기본값을 minutes/1로 설정
-  const [showBollingerBands, setShowBollingerBands] = useState(false); // 볼린저 밴드 표시 여부
+  const [bollingerBandsSettings, setBollingerBandsSettings] = useState([]); // 볼린저 밴드 설정
+  const [movingAverageSettings, setMovingAverageSettings] = useState([]); // 이동 평균 설정
   const [tooltipData, setTooltipData] = useState(null); // OHLC 값을 저장할 상태
-  const [selectedIndicators, setSelectedIndicators] = useState([]); // 선택된 지표를 저장할 상태
 
   const intervals = {
     "1일": "days",
@@ -29,21 +30,70 @@ const CandleChart = () => {
 
   useEffect(() => {
     if (data.length === 0) return;
-    drawChart({ svgRef, data, interval, showBollingerBands, setTooltipData });
-  }, [data, showBollingerBands, interval]);
+    drawChart({
+      svgRef,
+      data,
+      interval,
+      bollingerBandsSettings,
+      movingAverageSettings,
+      setTooltipData,
+    });
+  }, [data, bollingerBandsSettings, movingAverageSettings, interval]);
 
   const handleIndicatorChange = (indicator) => {
-    if (selectedIndicators.includes(indicator)) {
-      setSelectedIndicators(selectedIndicators.filter((i) => i !== indicator));
-      if (indicator === "bollingerBands") {
-        setShowBollingerBands(false);
-      }
-    } else {
-      setSelectedIndicators([...selectedIndicators, indicator]);
-      if (indicator === "bollingerBands") {
-        setShowBollingerBands(true);
-      }
+    if (indicator === "bollingerBands") {
+      setBollingerBandsSettings([...bollingerBandsSettings, { period: 20, stddev: 2, color: "blue" }]);
+    } else if (indicator === "movingAverage") {
+      setMovingAverageSettings([...movingAverageSettings, { period: 20, color: "red" }]);
     }
+  };
+
+  const handleBollingerBandSettingChange = (index, field, value) => {
+    const newSettings = [...bollingerBandsSettings];
+    newSettings[index][field] = value;
+    setBollingerBandsSettings(newSettings);
+    drawChart({
+      svgRef,
+      data,
+      interval,
+      bollingerBandsSettings: newSettings,
+      movingAverageSettings,
+      setTooltipData,
+    });
+  };
+
+  const handleMovingAverageSettingChange = (index, field, value) => {
+    const newSettings = [...movingAverageSettings];
+    newSettings[index][field] = value;
+    setMovingAverageSettings(newSettings);
+    drawChart({
+      svgRef,
+      data,
+      interval,
+      bollingerBandsSettings,
+      movingAverageSettings: newSettings,
+      setTooltipData,
+    });
+  };
+
+  const removeIndicator = (indicator, index) => {
+    if (indicator === "bollingerBands") {
+      const newSettings = [...bollingerBandsSettings];
+      newSettings.splice(index, 1);
+      setBollingerBandsSettings(newSettings);
+    } else if (indicator === "movingAverage") {
+      const newSettings = [...movingAverageSettings];
+      newSettings.splice(index, 1);
+      setMovingAverageSettings(newSettings);
+    }
+    drawChart({
+      svgRef,
+      data,
+      interval,
+      bollingerBandsSettings,
+      movingAverageSettings,
+      setTooltipData,
+    });
   };
 
   return (
@@ -65,25 +115,80 @@ const CandleChart = () => {
         </optgroup>
       </select>
       <div>
-        <button>
+        <button className="indicator-button">
           지표
-          <div>
-            <div onClick={() => handleIndicatorChange("bollingerBands")}>
-              <input type="checkbox" checked={selectedIndicators.includes("bollingerBands")} readOnly />
+          <div className="indicator-list">
+            <div
+              className="indicator-item"
+              onMouseEnter={(e) => e.currentTarget.classList.add("hover")}
+              onMouseLeave={(e) => e.currentTarget.classList.remove("hover")}
+              onClick={() => handleIndicatorChange("bollingerBands")}
+            >
               볼린저 밴드
+            </div>
+            <div
+              className="indicator-item"
+              onMouseEnter={(e) => e.currentTarget.classList.add("hover")}
+              onMouseLeave={(e) => e.currentTarget.classList.remove("hover")}
+              onClick={() => handleIndicatorChange("movingAverage")}
+            >
+              이동 평균
             </div>
           </div>
         </button>
         <div>
           <p>현재 적용된 지표:</p>
-          {selectedIndicators.map((indicator) => (
-            <div key={indicator}>
-              {indicator === "bollingerBands" && (
-                <div>
-                  <span>볼린저 밴드</span>
-                  <button onClick={() => handleIndicatorChange("bollingerBands")}>X</button>
-                </div>
-              )}
+          {bollingerBandsSettings.map((setting, index) => (
+            <div key={`bollinger-${index}`}>
+              <span>볼린저 밴드</span>
+              <label>
+                기간:
+                <input
+                  type="number"
+                  value={setting.period}
+                  onChange={(e) => handleBollingerBandSettingChange(index, "period", Number(e.target.value))}
+                />
+              </label>
+              <label>
+                표준 편차:
+                <input
+                  type="number"
+                  value={setting.stddev}
+                  step="0.1" // 0.1 단위로 변경되게 설정
+                  onChange={(e) => handleBollingerBandSettingChange(index, "stddev", Number(e.target.value))}
+                />
+              </label>
+              <label>
+                색상:
+                <input
+                  type="color"
+                  value={setting.color}
+                  onChange={(e) => handleBollingerBandSettingChange(index, "color", e.target.value)}
+                />
+              </label>
+              <button onClick={() => removeIndicator("bollingerBands", index)}>X</button>
+            </div>
+          ))}
+          {movingAverageSettings.map((setting, index) => (
+            <div key={`movingAverage-${index}`}>
+              <span>이동 평균</span>
+              <label>
+                기간:
+                <input
+                  type="number"
+                  value={setting.period}
+                  onChange={(e) => handleMovingAverageSettingChange(index, "period", Number(e.target.value))}
+                />
+              </label>
+              <label>
+                색상:
+                <input
+                  type="color"
+                  value={setting.color}
+                  onChange={(e) => handleMovingAverageSettingChange(index, "color", e.target.value)}
+                />
+              </label>
+              <button onClick={() => removeIndicator("movingAverage", index)}>X</button>
             </div>
           ))}
         </div>

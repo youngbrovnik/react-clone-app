@@ -1,0 +1,28 @@
+.indicator-button {
+  position: relative;
+  display: inline-block;
+}
+
+.indicator-list {
+  display: none;
+  position: absolute;
+  background-color: white;
+  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  min-width: 160px;
+  padding: 12px 16px;
+}
+
+.indicator-button:hover .indicator-list {
+  display: block;
+}
+
+.indicator-item {
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.indicator-item.hover,
+.indicator-item:hover {
+  background-color: #ddd;
+}

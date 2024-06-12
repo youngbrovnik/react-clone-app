@@ -1,6 +1,5 @@
 import * as d3 from "d3";
 import axios from "axios";
-import { calculateBollingerBands } from "./bollingerBands";
 
 const BOLLINGER_BAND_PERIOD = 20;
 
@@ -29,7 +28,45 @@ export const fetchData = async (interval, setData) => {
   }
 };
 
-export const drawChart = ({ svgRef, data, interval, showBollingerBands, setTooltipData }) => {
+export const calculateMovingAverage = (data, period) => {
+  return data
+    .map((d, i, arr) => {
+      if (i < period - 1) {
+        return null;
+      }
+      const sum = arr.slice(i - period + 1, i + 1).reduce((acc, val) => acc + val.close, 0);
+      return { date: d.date, value: sum / period };
+    })
+    .filter((d) => d !== null);
+};
+
+export const calculateBollingerBands = (data, windowSize, numStdDev) => {
+  let bollingerBands = data.map((d, i, arr) => {
+    if (i < windowSize - 1) {
+      return null;
+    }
+    const slice = arr.slice(i - windowSize + 1, i + 1);
+    const mean = slice.reduce((acc, val) => acc + val.close, 0) / windowSize;
+    const variance = slice.reduce((acc, val) => acc + Math.pow(val.close - mean, 2), 0) / windowSize;
+    const stdDev = Math.sqrt(variance);
+    return {
+      date: d.date,
+      middleBand: mean,
+      upperBand: mean + numStdDev * stdDev,
+      lowerBand: mean - numStdDev * stdDev,
+    };
+  });
+  return bollingerBands.filter((d) => d !== null);
+};
+
+export const drawChart = ({
+  svgRef,
+  data,
+  interval,
+  bollingerBandsSettings,
+  movingAverageSettings,
+  setTooltipData,
+}) => {
   const filteredData = data.slice(BOLLINGER_BAND_PERIOD - 1);
 
   const svg = d3.select(svgRef.current);
@@ -97,8 +134,8 @@ export const drawChart = ({ svgRef, data, interval, showBollingerBands, setToolt
     .attr("y2", (d) => y(d.low))
     .attr("stroke", "black");
 
-  if (showBollingerBands) {
-    const bollingerBands = calculateBollingerBands(data);
+  bollingerBandsSettings.forEach((setting) => {
+    const bollingerBands = calculateBollingerBands(data, setting.period, setting.stddev);
 
     const area = d3
       .area()
@@ -106,7 +143,7 @@ export const drawChart = ({ svgRef, data, interval, showBollingerBands, setToolt
       .y0((d) => y(d.upperBand))
       .y1((d) => y(d.lowerBand));
 
-    svg.append("path").datum(bollingerBands).attr("fill", "black").attr("opacity", 0.1).attr("d", area);
+    svg.append("path").datum(bollingerBands).attr("fill", setting.color).attr("opacity", 0.1).attr("d", area);
 
     const line = d3
       .line()
@@ -117,7 +154,7 @@ export const drawChart = ({ svgRef, data, interval, showBollingerBands, setToolt
       .append("path")
       .datum(bollingerBands)
       .attr("fill", "none")
-      .attr("stroke", "black")
+      .attr("stroke", setting.color)
       .attr("stroke-width", 1.5)
       .attr("d", line);
 
@@ -130,7 +167,7 @@ export const drawChart = ({ svgRef, data, interval, showBollingerBands, setToolt
       .append("path")
       .datum(bollingerBands)
       .attr("fill", "none")
-      .attr("stroke", "black")
+      .attr("stroke", setting.color)
       .attr("stroke-width", 1.5)
       .attr("d", upperLine);
 
@@ -143,10 +180,26 @@ export const drawChart = ({ svgRef, data, interval, showBollingerBands, setToolt
       .append("path")
       .datum(bollingerBands)
       .attr("fill", "none")
-      .attr("stroke", "black")
+      .attr("stroke", setting.color)
       .attr("stroke-width", 1.5)
       .attr("d", lowerLine);
-  }
+  });
+
+  movingAverageSettings.forEach((setting) => {
+    const movingAverage = calculateMovingAverage(data, setting.period);
+    const movingAverageLine = d3
+      .line()
+      .x((d) => x(d.date))
+      .y((d) => y(d.value));
+
+    svg
+      .append("path")
+      .datum(movingAverage)
+      .attr("fill", "none")
+      .attr("stroke", setting.color)
+      .attr("stroke-width", 1.5)
+      .attr("d", movingAverageLine);
+  });
 
   const focus = svg.append("g").attr("class", "focus").style("display", "none");
 
