@@ -5,9 +5,15 @@ import "./CandleChart.css"; // 스타일링을 위해 CSS 파일을 임포트합
 const CandleChart = () => {
   const svgRef = useRef();
   const [data, setData] = useState([]);
-  const [interval, setInterval] = useState("minutes/1"); // 기본값을 minutes/1로 설정
-  const [bollingerBandsSettings, setBollingerBandsSettings] = useState([]); // 볼린저 밴드 설정
-  const [movingAverageSettings, setMovingAverageSettings] = useState([]); // 이동 평균 설정
+  const [interval, setInterval] = useState(() => localStorage.getItem("interval") || "minutes/1"); // 기본값을 로컬 스토리지에서 가져옴
+  const [bollingerBandsSettings, setBollingerBandsSettings] = useState(() => {
+    const savedSettings = localStorage.getItem("bollingerBandsSettings");
+    return savedSettings ? JSON.parse(savedSettings) : [];
+  });
+  const [movingAverageSettings, setMovingAverageSettings] = useState(() => {
+    const savedSettings = localStorage.getItem("movingAverageSettings");
+    return savedSettings ? JSON.parse(savedSettings) : [];
+  });
   const [tooltipData, setTooltipData] = useState(null); // OHLC 값을 저장할 상태
 
   const intervals = {
@@ -40,11 +46,29 @@ const CandleChart = () => {
     });
   }, [data, bollingerBandsSettings, movingAverageSettings, interval]);
 
+  useEffect(() => {
+    localStorage.setItem("interval", interval);
+  }, [interval]);
+
+  useEffect(() => {
+    localStorage.setItem("bollingerBandsSettings", JSON.stringify(bollingerBandsSettings));
+  }, [bollingerBandsSettings]);
+
+  useEffect(() => {
+    localStorage.setItem("movingAverageSettings", JSON.stringify(movingAverageSettings));
+  }, [movingAverageSettings]);
+
+  const handleIntervalChange = (e) => {
+    const newInterval = intervals[e.target.value];
+    setInterval(newInterval);
+    localStorage.setItem("selectedIntervalLabel", e.target.value);
+  };
+
   const handleIndicatorChange = (indicator) => {
     if (indicator === "bollingerBands") {
-      setBollingerBandsSettings([...bollingerBandsSettings, { period: 20, stddev: 2, color: "blue" }]);
+      setBollingerBandsSettings([...bollingerBandsSettings, { period: 20, stddev: 2, color: "black" }]);
     } else if (indicator === "movingAverage") {
-      setMovingAverageSettings([...movingAverageSettings, { period: 20, color: "red" }]);
+      setMovingAverageSettings([...movingAverageSettings, { period: 20, color: "black" }]);
     }
   };
 
@@ -96,9 +120,11 @@ const CandleChart = () => {
     });
   };
 
+  const selectedIntervalLabel = localStorage.getItem("selectedIntervalLabel") || "1분";
+
   return (
     <div>
-      <select onChange={(e) => setInterval(intervals[e.target.value])} defaultValue="1분">
+      <select onChange={handleIntervalChange} value={selectedIntervalLabel}>
         <optgroup label="날짜 단위">
           <option value="1일">1일</option>
           <option value="1주">1주</option>
@@ -154,7 +180,7 @@ const CandleChart = () => {
                 <input
                   type="number"
                   value={setting.stddev}
-                  step="0.1" // 0.1 단위로 변경되게 설정
+                  step="0.1"
                   onChange={(e) => handleBollingerBandSettingChange(index, "stddev", Number(e.target.value))}
                 />
               </label>
