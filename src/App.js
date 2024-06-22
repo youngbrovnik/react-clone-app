@@ -1,8 +1,8 @@
 // src/App.js
 
 import React from "react";
-import "./App.css";
-import CandleChart from "./CandleChart";
+import "./styles/App.css";
+import CandleChart from "./components/CandleChart";
 
 function App() {
   return (
