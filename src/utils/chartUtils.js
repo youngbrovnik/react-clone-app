@@ -1,15 +1,26 @@
 import * as d3 from "d3";
 import axios from "axios";
+import { saveData, loadData } from "./idb"; // idb 헬퍼 파일에서 함수들을 가져옵니다.
 
 const BOLLINGER_BAND_PERIOD = 20;
+const BOLLINGER_BAND_STD_DEV = 2;
 
-export const fetchData = async (interval, setData) => {
+export const fetchData = async (interval, setData, page = 0) => {
   const [type, value] = interval.split("/");
   const count = 104 + BOLLINGER_BAND_PERIOD;
+  const toTime = new Date(Date.now() - page * count * 60000).toISOString();
   const url =
     type === "minutes"
-      ? `https://api.upbit.com/v1/candles/${type}/${value}?market=KRW-BTC&count=${count}`
-      : `https://api.upbit.com/v1/candles/${type}?market=KRW-BTC&count=${count}`;
+      ? `https://api.upbit.com/v1/candles/${type}/${value}?market=KRW-BTC&count=${count}&to=${toTime}`
+      : `https://api.upbit.com/v1/candles/${type}?market=KRW-BTC&count=${count}&to=${toTime}`;
+
+  const cacheKey = `${interval}-${page}`;
+  const cachedData = await loadData(cacheKey);
+
+  if (cachedData) {
+    if (setData) setData(cachedData);
+    return cachedData;
+  }
 
   try {
     const response = await axios.get(url);
@@ -22,10 +33,36 @@ export const fetchData = async (interval, setData) => {
         close: d.trade_price,
       }))
       .reverse(); // 최신 데이터를 오른쪽에 표시하기 위해 데이터 순서를 뒤집음
-    setData(transformedData);
+
+    await saveData(cacheKey, transformedData);
+    if (setData) setData(transformedData);
+    return transformedData; // transformedData 반환
   } catch (error) {
     console.error("Error fetching data: ", error);
   }
+};
+
+export const calculateBollingerBands = (
+  data,
+  windowSize = BOLLINGER_BAND_PERIOD,
+  numStdDev = BOLLINGER_BAND_STD_DEV
+) => {
+  const bollingerBands = data.map((d, i) => {
+    if (i < windowSize - 1) return null;
+
+    const slice = data.slice(i - windowSize + 1, i + 1);
+    const mean = d3.mean(slice, (d) => d.close);
+    const stdDev = d3.deviation(slice, (d) => d.close);
+
+    return {
+      date: d.date,
+      middleBand: mean,
+      upperBand: mean + numStdDev * stdDev,
+      lowerBand: mean - numStdDev * stdDev,
+    };
+  });
+
+  return bollingerBands.filter((d) => d !== null);
 };
 
 export const calculateMovingAverage = (data, period) => {
@@ -38,25 +75,6 @@ export const calculateMovingAverage = (data, period) => {
       return { date: d.date, value: sum / period };
     })
     .filter((d) => d !== null);
-};
-
-export const calculateBollingerBands = (data, windowSize, numStdDev) => {
-  let bollingerBands = data.map((d, i, arr) => {
-    if (i < windowSize - 1) {
-      return null;
-    }
-    const slice = arr.slice(i - windowSize + 1, i + 1);
-    const mean = slice.reduce((acc, val) => acc + val.close, 0) / windowSize;
-    const variance = slice.reduce((acc, val) => acc + Math.pow(val.close - mean, 2), 0) / windowSize;
-    const stdDev = Math.sqrt(variance);
-    return {
-      date: d.date,
-      middleBand: mean,
-      upperBand: mean + numStdDev * stdDev,
-      lowerBand: mean - numStdDev * stdDev,
-    };
-  });
-  return bollingerBands.filter((d) => d !== null);
 };
 
 export const drawChart = ({

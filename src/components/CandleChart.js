@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import useChartData from "../hooks/useChartData";
 import { drawChart } from "../utils/chartUtils";
 import IntervalSelector from "../components/IntervalSelector";
@@ -8,7 +8,7 @@ import "../styles/CandleChart.css";
 
 const CandleChart = () => {
   const svgRef = useRef();
-  const { data, interval, setInterval } = useChartData("minutes/1");
+  const { data, interval, setInterval, loadMoreData } = useChartData("minutes/1");
   const [bollingerBandsSettings, setBollingerBandsSettings] = useState(() => {
     const savedSettings = localStorage.getItem("bollingerBandsSettings");
     return savedSettings ? JSON.parse(savedSettings) : [];
@@ -18,8 +18,10 @@ const CandleChart = () => {
     return savedSettings ? JSON.parse(savedSettings) : [];
   });
   const [tooltipData, setTooltipData] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState(0);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (data.length === 0) return;
     drawChart({
       svgRef,
@@ -31,11 +33,11 @@ const CandleChart = () => {
     });
   }, [data, bollingerBandsSettings, movingAverageSettings, interval]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     localStorage.setItem("bollingerBandsSettings", JSON.stringify(bollingerBandsSettings));
   }, [bollingerBandsSettings]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     localStorage.setItem("movingAverageSettings", JSON.stringify(movingAverageSettings));
   }, [movingAverageSettings]);
 
@@ -77,10 +79,40 @@ const CandleChart = () => {
     }
   };
 
+  const handleMouseDown = (event) => {
+    setIsDragging(true);
+    setDragStart(event.clientX);
+  };
+
+  const handleMouseMove = (event) => {
+    if (!isDragging) return;
+
+    const dragEnd = event.clientX;
+    const dragDistance = dragEnd - dragStart;
+
+    if (dragDistance > 100) {
+      // 임계값을 조정하여 페이지 전환
+      loadMoreData("past");
+      setIsDragging(false);
+    } else if (dragDistance < -100) {
+      loadMoreData("future");
+      setIsDragging(false);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
   const selectedIntervalLabel = localStorage.getItem("selectedIntervalLabel") || "1분";
 
   return (
-    <div>
+    <div
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      style={{ cursor: isDragging ? "grabbing" : "grab" }}
+    >
       <IntervalSelector
         intervals={intervals}
         selectedIntervalLabel={selectedIntervalLabel}
